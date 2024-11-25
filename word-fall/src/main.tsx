@@ -8,6 +8,12 @@ Devvit.configure({
 
 const words = wordList; // Use the preprocessed word list
 
+// Custom delay function to simulate `setTimeout`
+const delay = (ms: number) =>
+  typeof setImmediate !== 'undefined'
+    ? new Promise((resolve) => setImmediate(resolve))
+    : Promise.resolve();
+
 // Choose a mix of small, medium, and large words for the game
 const selectRandomWords = (): string[] => {
   const smallWords = words.filter((word) => word.length >= 3 && word.length <= 4);
@@ -92,6 +98,7 @@ Devvit.addCustomPostType({
     );
     const [cursorX, setCursorX] = useState<number>(4);
     const [currentLetter, setCurrentLetter] = useState<string>('');
+    const [highlightedPositions, setHighlightedPositions] = useState<[number, number][]>([]);
     const [targetWords, setTargetWords] = useState<string[]>(() => {
       const selectedWords = selectRandomWords();
       console.log('Selected Target Words:', selectedWords);
@@ -102,30 +109,61 @@ Devvit.addCustomPostType({
       setCurrentLetter(generatePseudoRandomLetter(targetWords));
     }
 
-    const dropLetter = (column: number): void => {
-      const newGrid = [...grid];
-      for (let y = 8; y >= 0; y--) {
-        if (!newGrid[y][column]) {
-          newGrid[y][column] = currentLetter;
-          setGrid(newGrid);
-
-          const words = findWords(newGrid);
-          words.forEach(({ positions }) => {
-            positions.forEach(([py, px]) => {
-              newGrid[py][px] = null;
-            });
-          });
-
-          setGrid(newGrid);
-          setCurrentLetter(generatePseudoRandomLetter(targetWords));
-          break;
+    const applyGravity = (grid: (string | null)[][]): void => {
+      for (let x = 0; x < 9; x++) {
+        let stack = [];
+        for (let y = 8; y >= 0; y--) {
+          if (grid[y][x]) {
+            stack.push(grid[y][x]); // Collect non-empty cells
+            grid[y][x] = null; // Clear the cell
+          }
+        }
+        for (let y = 8; y >= 0 && stack.length > 0; y--) {
+          grid[y][x] = stack.shift()!;
         }
       }
     };
 
-    const handleColumnClick = (column: number): void => {
+    const dropLetter = async (column: number): Promise<void> => {
+      const newGrid = [...grid];
+
+      // Place the letter in the lowest available space
+      for (let y = 8; y >= 0; y--) {
+        if (!newGrid[y][column]) {
+          newGrid[y][column] = currentLetter;
+          break;
+        }
+      }
+
+      // Check for words and highlight them
+      const foundWords = findWords(newGrid);
+      if (foundWords.length > 0) {
+        const positionsToHighlight: [number, number][] = [];
+        foundWords.forEach(({ positions }) => {
+          positionsToHighlight.push(...positions);
+        });
+        setHighlightedPositions(positionsToHighlight);
+
+        // Simulate delay before clearing words
+        await delay(1000);
+
+        // Clear the highlighted positions
+        positionsToHighlight.forEach(([py, px]) => {
+          newGrid[py][px] = null;
+        });
+        setHighlightedPositions([]);
+        applyGravity(newGrid);
+        setGrid(newGrid);
+      } else {
+        setGrid(newGrid);
+      }
+
+      setCurrentLetter(generatePseudoRandomLetter(targetWords));
+    };
+
+    const handleColumnClick = async (column: number): Promise<void> => {
       setCursorX(column);
-      dropLetter(column);
+      await dropLetter(column);
     };
 
     const moveCursor = (direction: number): void => {
@@ -152,11 +190,13 @@ Devvit.addCustomPostType({
                   border="thin"
                   borderColor="gray"
                   backgroundColor={
-                    cursorX === x && y === 0
-                      ? 'lightgreen'
+                    highlightedPositions.some(([py, px]) => py === y && px === x)
+                      ? 'yellow' // Highlighted word
+                      : cursorX === x && y === 0
+                      ? 'lightgreen' // Active column
                       : letter
-                      ? 'lightblue'
-                      : 'transparent'
+                      ? 'lightblue' // Filled cell
+                      : 'transparent' // Empty cell
                   }
                   onPress={() => handleColumnClick(x)}
                 >
