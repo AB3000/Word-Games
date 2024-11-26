@@ -6,27 +6,26 @@ Devvit.configure({
   redditAPI: true,
 });
 
-const words = wordList; // Use the preprocessed word list
+const MIN_WORD_LENGTH = 4;
+const WORDS = wordList.filter((word) => word.length >= MIN_WORD_LENGTH); // Use the preprocessed word list
 const alphabetList = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const minWordLength = 6;
 const COLS = 5;
 const ROWS = 4;
 
 // Choose a mix of small, medium, and large words for the game
 const selectRandomWords = (): string[] => {
-  const smallWords = words.filter((word) => word.length >= 3 && word.length <= 4);
-  const mediumWords = words.filter((word) => word.length >= 5 && word.length <= 7);
-  const largeWords = words.filter((word) => word.length >= 8);
+  const smallWords = WORDS.filter((word) => word.length >= 3 && word.length <= 4);
+  const mediumWords = WORDS.filter((word) => word.length >= 5 && word.length <= 7);
+  const largeWords = WORDS.filter((word) => word.length >= 8);
 
-  const randomSmallWords = Array.from({ length: 1 }, () =>
-    smallWords[Math.floor(Math.random() * smallWords.length)].toUpperCase()
-  );
-  const randomMediumWords = Array.from({ length: 1 }, () =>
-    mediumWords[Math.floor(Math.random() * mediumWords.length)].toUpperCase()
-  );
-  const randomLargeWords = Array.from({ length: 1 }, () =>
-    largeWords[Math.floor(Math.random() * largeWords.length)].toUpperCase()
-  );
+  const randomSmallWords = smallWords.length ? 
+  [smallWords[Math.floor(Math.random() * smallWords.length)].toUpperCase()] : [];
+
+  const randomMediumWords = mediumWords.length ? 
+  [mediumWords[Math.floor(Math.random() * mediumWords.length)].toUpperCase()] : [];
+  
+  const randomLargeWords = largeWords.length ? 
+  [largeWords[Math.floor(Math.random() * largeWords.length)].toUpperCase()] : [];
 
   return [...randomSmallWords, ...randomMediumWords, ...randomLargeWords];
 };
@@ -34,14 +33,12 @@ const selectRandomWords = (): string[] => {
 
 const generatePseudoRandomLetter = (targetWords: string[]): string => {
   const targetLetters = targetWords.join('');
-  console.log("TARGET LETTER ARE", targetLetters);
   const allLetters = targetLetters + alphabetList.repeat(3);
-  console.log("ALL LETTERS ARE", allLetters);
   return allLetters[Math.floor(Math.random() * allLetters.length)];
 };
 
 // Check if a word exists in the dictionary
-const isWordValid = (word: string): boolean => words.includes(word.toLowerCase());
+const isWordValid = (word: string): boolean => WORDS.includes(word.toLowerCase());
 
 // Find all words in the grid with a minimum length filter
 const findWords = (grid: (string | null)[][]): { word: string; positions: [number, number][] }[] => {
@@ -75,8 +72,8 @@ const findWords = (grid: (string | null)[][]): { word: string; positions: [numbe
           word += grid[ny][nx];
           positions.push([ny, nx]);
 
-          // Only include words with minWordLength or more letters
-          if (isWordValid(word) && word.length >= minWordLength) {
+          // Only include words with MIN_WORD_LENGTH or more letters
+          if (word.length >= MIN_WORD_LENGTH && isWordValid(word)) {
             words.push({ word, positions: [...positions] });
           }
 
@@ -144,9 +141,11 @@ Devvit.addCustomPostType({
       console.log('Before dropping letter:', JSON.stringify(newGrid));
 
       // Place the letter in the lowest available space
+      var placed = false;
       for (let y = ROWS - 1; y >= 0; y--) {
         if (!newGrid[y][column]) {
           newGrid[y][column] = currentLetter;
+          placed = true;
           break;
         }
       }
@@ -181,7 +180,9 @@ Devvit.addCustomPostType({
         setHighlightedPositions([]); // Clear highlights
       }
 
-      setCurrentLetter(generatePseudoRandomLetter(targetWords));
+      if (placed){
+        setCurrentLetter(generatePseudoRandomLetter(targetWords));
+      }
     };
 
     const handleColumnClick = async (column: number): Promise<void> => {
