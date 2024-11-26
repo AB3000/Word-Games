@@ -7,6 +7,8 @@ Devvit.configure({
 });
 
 const words = wordList; // Use the preprocessed word list
+const alphabetList = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const minWordLength = 6;
 
 // Choose a mix of small, medium, and large words for the game
 const selectRandomWords = (): string[] => {
@@ -27,11 +29,12 @@ const selectRandomWords = (): string[] => {
   return [...randomSmallWords, ...randomMediumWords, ...randomLargeWords];
 };
 
-// Generate pseudo-random letters (with filler logic)
+
 const generatePseudoRandomLetter = (targetWords: string[]): string => {
   const targetLetters = targetWords.join('');
-  const fillerLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const allLetters = targetLetters + fillerLetters.repeat(3);
+  console.log("TARGET LETTER ARE", targetLetters);
+  const allLetters = targetLetters + alphabetList.repeat(3);
+  console.log("ALL LETTERS ARE", allLetters);
   return allLetters[Math.floor(Math.random() * allLetters.length)];
 };
 
@@ -46,6 +49,10 @@ const findWords = (grid: (string | null)[][]): { word: string; positions: [numbe
     [1, 0], // Vertical down
     [1, 1], // Diagonal down-right
     [1, -1], // Diagonal down-left
+    [0, -1], // Horizontal left
+    [-1, 0], // Verical up
+    [-1, 1], // diagonal up-right
+    [-1, -1] // diagonal up-left
   ];
 
   for (let y = 0; y < grid.length; y++) {
@@ -66,8 +73,8 @@ const findWords = (grid: (string | null)[][]): { word: string; positions: [numbe
           word += grid[ny][nx];
           positions.push([ny, nx]);
 
-          // Only include words with 4 or more letters
-          if (isWordValid(word) && word.length >= 4) {
+          // Only include words with minWordLength or more letters
+          if (isWordValid(word) && word.length >= minWordLength) {
             words.push({ word, positions: [...positions] });
           }
 
