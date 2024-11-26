@@ -9,6 +9,8 @@ Devvit.configure({
 const words = wordList; // Use the preprocessed word list
 const alphabetList = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const minWordLength = 6;
+const COLS = 5;
+const ROWS = 4;
 
 // Choose a mix of small, medium, and large words for the game
 const selectRandomWords = (): string[] => {
@@ -16,13 +18,13 @@ const selectRandomWords = (): string[] => {
   const mediumWords = words.filter((word) => word.length >= 5 && word.length <= 7);
   const largeWords = words.filter((word) => word.length >= 8);
 
-  const randomSmallWords = Array.from({ length: 5 }, () =>
+  const randomSmallWords = Array.from({ length: 1 }, () =>
     smallWords[Math.floor(Math.random() * smallWords.length)].toUpperCase()
   );
-  const randomMediumWords = Array.from({ length: 7 }, () =>
+  const randomMediumWords = Array.from({ length: 1 }, () =>
     mediumWords[Math.floor(Math.random() * mediumWords.length)].toUpperCase()
   );
-  const randomLargeWords = Array.from({ length: 3 }, () =>
+  const randomLargeWords = Array.from({ length: 1 }, () =>
     largeWords[Math.floor(Math.random() * largeWords.length)].toUpperCase()
   );
 
@@ -90,15 +92,15 @@ const findWords = (grid: (string | null)[][]): { word: string; positions: [numbe
 
 // Gravity logic to make letters fall after clearing words
 const applyGravity = (grid: (string | null)[][]): void => {
-  for (let x = 0; x < 9; x++) {
+  for (let x = 0; x < COLS; x++) {
     const stack: (string | null)[] = [];
-    for (let y = 8; y >= 0; y--) {
+    for (let y = ROWS -1 ; y >= 0; y--) {
       if (grid[y][x]) {
         stack.push(grid[y][x]); // Collect non-empty cells
         grid[y][x] = null; // Clear the cell
       }
     }
-    for (let y = 8; stack.length > 0 && y >= 0; y--) {
+    for (let y = ROWS - 1; stack.length > 0 && y >= 0; y--) {
       grid[y][x] = stack.shift()!;
     }
   }
@@ -120,9 +122,9 @@ Devvit.addCustomPostType({
   height: 'tall',
   render: () => {
     const [grid, setGrid] = useState<(string | null)[][]>(
-      Array(9)
+      Array(ROWS)
         .fill(null)
-        .map(() => Array(9).fill(null))
+        .map(() => Array(COLS).fill(null))
     );
     const [cursorX, setCursorX] = useState<number>(4);
     const [currentLetter, setCurrentLetter] = useState<string>('');
@@ -142,7 +144,7 @@ Devvit.addCustomPostType({
       console.log('Before dropping letter:', JSON.stringify(newGrid));
 
       // Place the letter in the lowest available space
-      for (let y = 8; y >= 0; y--) {
+      for (let y = ROWS - 1; y >= 0; y--) {
         if (!newGrid[y][column]) {
           newGrid[y][column] = currentLetter;
           break;
@@ -188,7 +190,18 @@ Devvit.addCustomPostType({
     };
 
     const moveCursor = (direction: number): void => {
-      setCursorX((prev) => Math.max(0, Math.min(8, prev + direction)));
+      // setCursorX((prev) => Math.max(0, Math.min(8, prev + direction)));
+      setCursorX((prev) => {
+        const newPosition = prev + direction;
+        if (newPosition < 0) {
+          return newPosition + COLS
+        }
+        else if (newPosition >= COLS) {
+        return newPosition - COLS
+        } else {
+          return newPosition
+        }
+      });
     };
 
     return (
