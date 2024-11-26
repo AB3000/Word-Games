@@ -8,12 +8,6 @@ Devvit.configure({
 
 const words = wordList; // Use the preprocessed word list
 
-// Custom delay function to simulate `setTimeout`
-const delay = (ms: number) =>
-  typeof setImmediate !== 'undefined'
-    ? new Promise((resolve) => setImmediate(resolve))
-    : Promise.resolve();
-
 // Choose a mix of small, medium, and large words for the game
 const selectRandomWords = (): string[] => {
   const smallWords = words.filter((word) => word.length >= 3 && word.length <= 4);
@@ -44,7 +38,7 @@ const generatePseudoRandomLetter = (targetWords: string[]): string => {
 // Check if a word exists in the dictionary
 const isWordValid = (word: string): boolean => words.includes(word.toLowerCase());
 
-// Find all words in the grid
+// Find all words in the grid with a minimum length filter
 const findWords = (grid: (string | null)[][]): { word: string; positions: [number, number][] }[] => {
   const words: { word: string; positions: [number, number][] }[] = [];
   const directions = [
@@ -72,7 +66,8 @@ const findWords = (grid: (string | null)[][]): { word: string; positions: [numbe
           word += grid[ny][nx];
           positions.push([ny, nx]);
 
-          if (isWordValid(word)) {
+          // Only include words with 4 or more letters
+          if (isWordValid(word) && word.length >= 4) {
             words.push({ word, positions: [...positions] });
           }
 
@@ -85,6 +80,32 @@ const findWords = (grid: (string | null)[][]): { word: string; positions: [numbe
 
   return words;
 };
+
+// Gravity logic to make letters fall after clearing words
+const applyGravity = (grid: (string | null)[][]): void => {
+  for (let x = 0; x < 9; x++) {
+    const stack: (string | null)[] = [];
+    for (let y = 8; y >= 0; y--) {
+      if (grid[y][x]) {
+        stack.push(grid[y][x]); // Collect non-empty cells
+        grid[y][x] = null; // Clear the cell
+      }
+    }
+    for (let y = 8; stack.length > 0 && y >= 0; y--) {
+      grid[y][x] = stack.shift()!;
+    }
+  }
+};
+
+// Custom delay function for animations
+const delay = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    if (typeof setTimeout !== 'undefined') {
+      setTimeout(resolve, ms); // Standard delay
+    } else {
+      resolve(); // No delay mechanism available, resolve immediately
+    }
+  });
 
 // Main game component
 Devvit.addCustomPostType({
@@ -109,23 +130,9 @@ Devvit.addCustomPostType({
       setCurrentLetter(generatePseudoRandomLetter(targetWords));
     }
 
-    const applyGravity = (grid: (string | null)[][]): void => {
-      for (let x = 0; x < 9; x++) {
-        let stack = [];
-        for (let y = 8; y >= 0; y--) {
-          if (grid[y][x]) {
-            stack.push(grid[y][x]); // Collect non-empty cells
-            grid[y][x] = null; // Clear the cell
-          }
-        }
-        for (let y = 8; y >= 0 && stack.length > 0; y--) {
-          grid[y][x] = stack.shift()!;
-        }
-      }
-    };
-
     const dropLetter = async (column: number): Promise<void> => {
       const newGrid = [...grid];
+      console.log('Before dropping letter:', JSON.stringify(newGrid));
 
       // Place the letter in the lowest available space
       for (let y = 8; y >= 0; y--) {
@@ -135,27 +142,34 @@ Devvit.addCustomPostType({
         }
       }
 
-      // Check for words and highlight them
+      console.log('After placing letter:', JSON.stringify(newGrid));
+      setGrid(newGrid);
+
+      // Find words with the updated grid
       const foundWords = findWords(newGrid);
+      console.log('Words found (4+ letters):', foundWords);
+
       if (foundWords.length > 0) {
-        const positionsToHighlight: [number, number][] = [];
-        foundWords.forEach(({ positions }) => {
-          positionsToHighlight.push(...positions);
-        });
+        const positionsToHighlight = foundWords.flatMap(({ positions }) => positions);
+        console.log('Highlighting positions:', positionsToHighlight);
         setHighlightedPositions(positionsToHighlight);
 
-        // Simulate delay before clearing words
+        // Animation: Highlight cells for 1 second
         await delay(1000);
 
-        // Clear the highlighted positions
+        // Clear words immediately
         positionsToHighlight.forEach(([py, px]) => {
           newGrid[py][px] = null;
         });
-        setHighlightedPositions([]);
+
+        console.log('After clearing words:', JSON.stringify(newGrid));
+
+        // Apply gravity and update grid
         applyGravity(newGrid);
+        console.log('After applying gravity:', JSON.stringify(newGrid));
+
         setGrid(newGrid);
-      } else {
-        setGrid(newGrid);
+        setHighlightedPositions([]); // Clear highlights
       }
 
       setCurrentLetter(generatePseudoRandomLetter(targetWords));
