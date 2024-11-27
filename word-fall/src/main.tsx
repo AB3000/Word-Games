@@ -9,8 +9,8 @@ Devvit.configure({
 const MIN_WORD_LENGTH = 4;
 const WORDS = wordList.filter((word) => word.length >= MIN_WORD_LENGTH); // Use the preprocessed word list
 const alphabetList = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const COLS = 5;
-const ROWS = 4;
+const COLS = 7;
+const ROWS = 7;
 
 // Choose a mix of small, medium, and large words for the game
 const selectRandomWords = (): string[] => {
@@ -28,13 +28,6 @@ const selectRandomWords = (): string[] => {
   [largeWords[Math.floor(Math.random() * largeWords.length)].toUpperCase()] : [];
 
   return [...randomSmallWords, ...randomMediumWords, ...randomLargeWords];
-};
-
-
-const generatePseudoRandomLetter = (targetWords: string[]): string => {
-  const targetLetters = targetWords.join('');
-  const allLetters = targetLetters + alphabetList.repeat(3);
-  return allLetters[Math.floor(Math.random() * allLetters.length)];
 };
 
 // Check if a word exists in the dictionary
@@ -103,15 +96,6 @@ const applyGravity = (grid: (string | null)[][]): void => {
   }
 };
 
-// Custom delay function for animations
-const delay = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    if (typeof setTimeout !== 'undefined') {
-      setTimeout(resolve, ms); // Standard delay
-    } else {
-      resolve(); // No delay mechanism available, resolve immediately
-    }
-  });
 
 // Main game component
 Devvit.addCustomPostType({
@@ -132,15 +116,35 @@ Devvit.addCustomPostType({
       return selectedWords;
     });
 
+
+    const generatePseudoRandomLetter = (): string => {
+      const targetLetters = targetWords.join('');
+      return targetLetters[Math.floor(Math.random() * targetLetters.length)];
+    };
+
     if (!currentLetter) {
-      setCurrentLetter(generatePseudoRandomLetter(targetWords));
+      setCurrentLetter(generatePseudoRandomLetter());
     }
 
-    const dropLetter = async (column: number): Promise<void> => {
+    // Clear the highlighted words and apply gravity
+    const handleClearWords = () => {
       const newGrid = [...grid];
-      console.log('Before dropping letter:', JSON.stringify(newGrid));
+      highlightedPositions.forEach(([py, px]) => {
+          newGrid[py][px] = null;
+        });
+      applyGravity(newGrid);
+      setGrid(newGrid);
+      setHighlightedPositions([]);
+    };
 
-      // Place the letter in the lowest available space
+    const placeLetterOrClear = (column: number) => {
+      if (highlightedPositions.length) {
+        handleClearWords();
+        return
+      }
+      
+      // First action - update grid with new letter
+      const newGrid = [...grid];
       var placed = false;
       for (let y = ROWS - 1; y >= 0; y--) {
         if (!newGrid[y][column]) {
@@ -149,49 +153,27 @@ Devvit.addCustomPostType({
           break;
         }
       }
-
-      console.log('After placing letter:', JSON.stringify(newGrid));
       setGrid(newGrid);
 
-      // Find words with the updated grid
-      const foundWords = findWords(newGrid);
-      console.log('Words found (4+ letters):', foundWords);
-
-      if (foundWords.length > 0) {
-        const positionsToHighlight = foundWords.flatMap(({ positions }) => positions);
-        console.log('Highlighting positions:', positionsToHighlight);
-        setHighlightedPositions(positionsToHighlight);
-
-        // Animation: Highlight cells for 1 second
-        await delay(1000);
-
-        // Clear words immediately
-        positionsToHighlight.forEach(([py, px]) => {
-          newGrid[py][px] = null;
-        });
-
-        console.log('After clearing words:', JSON.stringify(newGrid));
-
-        // Apply gravity and update grid
-        applyGravity(newGrid);
-        console.log('After applying gravity:', JSON.stringify(newGrid));
-
-        setGrid(newGrid);
-        setHighlightedPositions([]); // Clear highlights
-      }
-
       if (placed){
-        setCurrentLetter(generatePseudoRandomLetter(targetWords));
+        setCurrentLetter(generatePseudoRandomLetter());
       }
-    };
-
-    const handleColumnClick = async (column: number): Promise<void> => {
-      setCursorX(column);
-      await dropLetter(column);
+    
+      // Set highlight state
+      const foundWords = findWords(newGrid);
+      if (foundWords.length > 0) {
+        const positions = foundWords.flatMap(({ positions }) => positions);
+        setHighlightedPositions(positions);
+      }
     };
 
     const moveCursor = (direction: number): void => {
-      // setCursorX((prev) => Math.max(0, Math.min(8, prev + direction)));
+
+       if (highlightedPositions.length) {
+        // If words exist, then clear it and re-render by returning
+        handleClearWords();
+        return
+      }
       setCursorX((prev) => {
         const newPosition = prev + direction;
         if (newPosition < 0) {
@@ -203,6 +185,11 @@ Devvit.addCustomPostType({
           return newPosition
         }
       });
+    };
+
+    const handleColumnClick = async (column: number): Promise<void> => {
+      setCursorX(column);
+      placeLetterOrClear(column);
     };
 
     return (
@@ -226,7 +213,7 @@ Devvit.addCustomPostType({
                   borderColor="gray"
                   backgroundColor={
                     highlightedPositions.some(([py, px]) => py === y && px === x)
-                      ? 'yellow' // Highlighted word
+                      ? 'lightyellow' // Highlighted word
                       : cursorX === x && y === 0
                       ? 'lightgreen' // Active column
                       : letter
@@ -243,7 +230,7 @@ Devvit.addCustomPostType({
         </vstack>
         <hstack gap="medium" alignment="center middle">
           <button onPress={() => moveCursor(-1)}>←</button>
-          <button onPress={() => dropLetter(cursorX)}>Drop Letter</button>
+          <button onPress={() => placeLetterOrClear(cursorX)}>Drop Letter</button>
           <button onPress={() => moveCursor(1)}>→</button>
         </hstack>
       </vstack>
